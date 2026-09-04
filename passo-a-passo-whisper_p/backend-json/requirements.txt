@@ -1,0 +1,7 @@
+# Em produção, fixe as versões (ex.: fastapi==0.115.6) para que a
+# imagem reconstruída daqui a seis meses seja a mesma de hoje.
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+openai-whisper

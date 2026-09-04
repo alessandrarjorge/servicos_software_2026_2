@@ -1,0 +1,22 @@
+# Tudo o que estiver aqui NÃO é enviado ao daemon como contexto de
+# build. Um .venv esquecido transforma um contexto de 200 KB em
+# centenas de megabytes — e pode vazar arquivos para dentro da imagem.
+**/.git
+**/.gitignore
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.env
+**/.vscode
+**/.idea
+**/.DS_Store
+**/node_modules
+**/Dockerfile*
+**/compose.y*ml
+**/docker-compose*
+**/*.wav
+**/*.mp3
+**/*.m4a
+LICENSE
+README.md

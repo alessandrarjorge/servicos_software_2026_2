@@ -1,0 +1,71 @@
+name: whisper-lab
+
+services:
+
+  # ------------------------------------------------------------------
+  # Front-end: interface web Gradio. É o ÚNICO serviço que precisa
+  # publicar porta no host — é ele que o navegador do aluno acessa.
+  # ------------------------------------------------------------------
+  gradio-service:
+    build:
+      context: ./gradio-json
+      dockerfile: Dockerfile
+    container_name: whisper-frontend
+    ports:
+      - "${FRONTEND_PORT:-7860}:7860"
+    environment:
+      # O hostname abaixo é o NOME DO SERVIÇO vizinho neste arquivo.
+      # É esse nome que o DNS interno do Docker (127.0.0.11) resolve.
+      # Usar "localhost" aqui NÃO funciona: dentro deste contêiner,
+      # localhost é este próprio contêiner.
+      BACKEND_URL: "http://${BACKEND_HOST:-backend-service}:${BACKEND_PORT:-8080}"
+      REQUEST_TIMEOUT: "${REQUEST_TIMEOUT:-600}"
+    depends_on:
+      backend-service:
+        # Espera o healthcheck do back-end passar, não apenas o
+        # contêiner ser criado. Sem isso, as primeiras transcrições
+        # falham enquanto o modelo Whisper ainda está carregando.
+        condition: service_healthy
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------
+  # Back-end: API FastAPI com Whisper. Em produção NÃO publicaria
+  # porta alguma — a linha "ports" existe só para conseguirmos
+  # testar a API isoladamente com curl.
+  # ------------------------------------------------------------------
+  backend-service:
+    build:
+      context: ./backend-json
+      dockerfile: Dockerfile
+    container_name: whisper-backend
+    expose:
+      - "8080"
+    ports:
+      - "${BACKEND_PUBLISHED_PORT:-8080}:8080"   # opcional: só depuração
+    environment:
+      WHISPER_MODEL: "${WHISPER_MODEL:-base}"
+      WHISPER_LANGUAGE: "${WHISPER_LANGUAGE:-pt}"
+    volumes:
+      # Volume NOMEADO: o modelo baixado sobrevive ao "compose down".
+      # A primeira subida demora minutos; as seguintes, segundos.
+      - whisper-models:/root/.cache/whisper
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8080/')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      # Janela em que as falhas não contam: cobre o download e a
+      # carga do modelo na primeira execução.
+      start_period: 300s
+    networks:
+      - app-net
+    restart: unless-stopped
+
+volumes:
+  whisper-models:
+
+networks:
+  app-net:
+    driver: bridge

@@ -6,7 +6,7 @@ BACKEND_URL = os.getenv(
     "BACKEND_URL", "http://backend-servide:8080"
 )
 
-def processa_audii(audio_path):
+def processa_audio(audio_path):
     if audio_path is None:
         return "Nenhum áudio recebido."
     
@@ -25,4 +25,4 @@ def processa_audii(audio_path):
     if r.status_code == 200:
         return f"Erro no servidor {r.status_code}"
     return r.json().get("texto","Sem texto")
-    
+

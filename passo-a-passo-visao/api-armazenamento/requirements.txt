@@ -1,0 +1,7 @@
+# Em produção, fixe as versões (ex.: fastapi==0.115.6) para que a
+# imagem reconstruída daqui a seis meses seja a mesma de hoje.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+

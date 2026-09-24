@@ -1,0 +1,113 @@
+name: visao-lab
+
+# Cinco servicos, uma rede, tres volumes nomeados.
+# A chave image: nao muda nada agora - ela existe para o docker compose push
+# da aula 06 e para o kompose da aula 07.
+
+services:
+  # ---------------- trilha de audio (vinda da aula 05) ----------------
+  gradio-service:
+    image: ${DOCKERHUB_USER}/gradio-service:${TAG}
+    build:
+      context: ./gradio-json
+      dockerfile: Dockerfile
+    container_name: whisper-frontend
+    ports:
+      - "${FRONTEND_PORT}:7860"
+    environment:
+      BACKEND_URL: http://${BACKEND_HOST}:${BACKEND_PORT}
+    depends_on:
+      backend-service:
+        condition: service_healthy
+    networks: [ app-net ]
+    restart: unless-stopped
+
+  backend-service:
+    image: ${DOCKERHUB_USER}/backend-service:${TAG}
+    build:
+      context: ./backend-json
+      dockerfile: Dockerfile
+    container_name: whisper-backend
+    ports:
+      - "${BACKEND_PORT}:8080"
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL}
+    volumes:
+      - whisper-models:/root/.cache/whisper
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8080/')" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 900s
+    networks: [ app-net ]
+    restart: unless-stopped
+
+  # ---------------- trilha de imagem (nova) ----------------
+  visao-service:
+    image: ${DOCKERHUB_USER}/visao-service:${TAG}
+    build:
+      context: ./gradio-visao
+      dockerfile: Dockerfile
+    container_name: visao-frontend
+    ports:
+      - "${VISAO_PORT}:7861"
+    environment:
+      ANALISE_URL: http://${ANALISE_HOST}:${ANALISE_PORT}
+    depends_on:
+      analise-service:
+        condition: service_healthy
+    networks: [ app-net ]
+    restart: unless-stopped
+
+  analise-service:
+    image: ${DOCKERHUB_USER}/analise-service:${TAG}
+    build:
+      context: ./api-visao
+      dockerfile: Dockerfile
+    container_name: visao-backend
+    ports:
+      - "${ANALISE_PORT}:8081"
+    environment:
+      MODELO_VISAO: ${MODELO_VISAO}
+      ARMAZENAMENTO_URL: http://${ARMAZENAMENTO_HOST}:${ARMAZENAMENTO_PORT}
+    volumes:
+      - hf-models:/root/.cache/huggingface
+    depends_on:
+      armazenamento-service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8081/')" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 900s
+    networks: [ app-net ]
+    restart: unless-stopped
+
+  armazenamento-service:
+    image: ${DOCKERHUB_USER}/armazenamento-service:${TAG}
+    build:
+      context: ./api-armazenamento
+      dockerfile: Dockerfile
+    container_name: visao-armazenamento
+    ports:
+      - "${ARMAZENAMENTO_PORT}:8082"
+    volumes:
+      - dados-imagens:/dados
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8082/')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [ app-net ]
+    restart: unless-stopped
+
+volumes:
+  whisper-models:
+  hf-models:
+  dados-imagens:
+
+networks:
+  app-net: { driver: bridge }

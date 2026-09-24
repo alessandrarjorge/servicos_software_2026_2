@@ -1,0 +1,42 @@
+# Versão de produção do back-end — usada na atividade D do roteiro.
+# Para construir com este arquivo em vez do Dockerfile de aula:
+#   docker compose build --build-arg ...   (ou aponte dockerfile: Dockerfile.prod
+#   na chave build: do compose.yaml)
+
+# ---------- estágio 1: build ----------
+FROM python:3.11-slim AS builder
+
+WORKDIR /code
+COPY requirements.txt .
+# --prefix isola o resultado da instalação em /inst, que é a única
+# coisa que atravessa para a imagem final.
+RUN pip install --no-cache-dir --prefix=/inst -r requirements.txt
+
+# ---------- estágio 2: runtime ----------
+FROM python:3.11-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/* \
+  && useradd -m -u 10001 appuser
+
+COPY --from=builder /inst /usr/local
+COPY --chown=appuser:appuser ./app /code/app
+
+# Modelo assado na imagem: a subida deixa de depender da rede e passa
+# a levar segundos. Troca-se tamanho de imagem por start determinístico.
+ENV WHISPER_MODEL=base
+ENV XDG_CACHE_HOME=/opt/cache
+RUN mkdir -p /opt/cache \
+  && python -c "import whisper; whisper.load_model('${WHISPER_MODEL}')" \
+  && chown -R appuser:appuser /opt/cache
+
+USER appuser
+WORKDIR /code
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=15s --timeout=10s --retries=5 --start-period=30s \
+  CMD python -c "import urllib.request as u; u.urlopen('http://localhost:8080/')"
+
+CMD ["uvicorn", "app.main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "8080"]
